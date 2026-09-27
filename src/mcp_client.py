@@ -7,6 +7,11 @@ async def demo() :
         for tool in tools :
             print(f"{tool.name} => {tool.description}")
 
+    async with Client("http://127.0.0.1:8000/mcp") as client :
+        resources = await client.list_resources();
+        for res in resources :
+            print(f"{res.name} => {res.description}")
+
 
 async def call_tools() :
     async with Client("http://127.0.0.1:8000/mcp") as client :
@@ -35,6 +40,12 @@ async def call_tools() :
         print("_______________________________________________________")
 
         print(f"Todo found by title: {todo.data}")
+
+    async with Client("http://127.0.0.1:8000/mcp") as client :
+        todos = await client.read_resource("todos://get_all");
+        print("________________________________Res from Resources_________________________")
+        for todo in todos :
+            print(todo.text);
 
 
 async def main():

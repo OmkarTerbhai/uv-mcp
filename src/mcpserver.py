@@ -36,6 +36,9 @@ def _load() -> dict[str, Todo] :
         return {};
 
     raw_data = json.loads(STORE_PATH.read_text() or []);
+    if raw_data == [] :
+        return {};
+
     return {item.get("id") : Todo.model_validate(item)
              for item in raw_data};
 
@@ -177,7 +180,7 @@ def update_todo(
 
     return todo;
 
-
+@mcp.resource("todos://get_all")
 def todos_resource() -> list[dict] :
     """List all todos as a readable resource stream"""
 
