@@ -136,6 +136,57 @@ def get_todo_by_title(
 
     return None;
 
+def delete_todo(
+        todo_id : Annotated[str, "ID of the todo to be deleted"]
+) -> str :
+    """Delete a todo by id and return the id"""
+
+    with _LOCK :
+        todos, _ = _get_or_raise(todo_id);
+        del todos[todo_id];
+        _save(todos);
+
+    return f"Deleted todo with id {todo_id}";
+
+@mcp.tool
+def update_todo(
+        todo_id : Annotated[str, "ID of todo to be updated"],
+        title : Annotated[str | None, "New updated title or None"] = None,
+        description : Annotated[str | None, "New updated description(optional)"] = None,
+        status : Annotated[status_enum | None, "pending, completed, deleted"] = None
+) -> Todo :
+
+    """Update a todo when given its ID """
+
+    with _LOCK :
+        todos, todo = _get_or_raise(todo_id);
+        if title is not None :
+            title = title.strip();
+            if not title :
+                raise ValueError("Title cannot be null");
+
+            todo.title = title;
+        if description is not None :
+            todo.description = description;
+        if status is not None :
+            todo.status = status;
+        todo.updated_at = _now();
+        todo.created_at = _now();
+        todos[todo_id] = todo;
+        _save(todos);
+
+    return todo;
+
+
+def todos_resource() -> list[dict] :
+    """List all todos as a readable resource stream"""
+
+    with _LOCK :
+        todos = list(_load().values());
+
+    todos.sort(key=lambda todo :todo.created_at, reverse=True);
+
+    return [todo.model_dump() for todo in todos];
 
 if __name__ == "__main__":
     mcp.run(transport="http", host="127.0.0.1", port=8000)
