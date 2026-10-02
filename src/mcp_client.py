@@ -1,56 +1,87 @@
-from fastmcp import Client
 import asyncio
 
-async def demo() :
-    async with Client("http://127.0.0.1:8000/mcp") as client :
-        tools = await client.list_tools()
-        for tool in tools :
-            print(f"{tool.name} => {tool.description}")
+from fastmcp import Client
+from fastmcp.client.auth import OAuth
+from fastmcp.exceptions import ToolError
 
-    async with Client("http://127.0.0.1:8000/mcp") as client :
-        resources = await client.list_resources();
-        for res in resources :
-            print(f"{res.name} => {res.description}")
+MCP_URL = "http://localhost:8000/mcp"
 
 
-async def call_tools() :
-    async with Client("http://127.0.0.1:8000/mcp") as client :
-        created_todo = await client.call_tool(
-            "create_todo",
-            {"title": "Make monthly budget",
-             "description": "List every expense and savings",
-             "status": "Pending"}
-        );
-
-        print(f"Created Todo => {created_todo}");
-
-    async with Client("http://127.0.0.1:8000/mcp") as client :
-        todos = await client.call_tool(
-            "list_todos"
-        );
-
-        for todo in todos.data:
-            print(f"Todo: {todo}")
+def _get_auth_config() -> OAuth:
+    return OAuth(
+        mcp_url=MCP_URL,
+        scopes=["todo:read", "todo:write"],
+        client_name="Descope FastMCP Client",
+        callback_host="localhost",
+    )
 
 
-    async with Client("http://127.0.0.1:8000/mcp") as client:
-        todo = await client.call_tool(
-            "get_todo_by_title",  {"todo_title": "monthly"}
-        );
-        print("_______________________________________________________")
+async def demo(client: Client) -> None:
+    print("=== Tools ===")
+    for tool in await client.list_tools():
+        print(f"{tool.name} => {tool.description}")
 
-        print(f"Todo found by title: {todo.data}")
+    print("\n=== Resources ===")
+    for res in await client.list_resources():
+        print(f"{res.name} => {res.description}")
 
-    async with Client("http://127.0.0.1:8000/mcp") as client :
-        todos = await client.read_resource("todos://get_all");
-        print("________________________________Res from Resources_________________________")
-        for todo in todos :
-            print(todo.text);
+    print("\n=== Who am I ===")
+    who = await client.call_tool("whoami")
+    print(who.data)
 
 
-async def main():
-    await demo()
-    await call_tools()
+async def call_tools(client: Client) -> None:
+    print("\n=== Create ===")
+    created = await client.call_tool(
+        "create_todo",
+        {
+            "title": "Make monthly budget",
+            "description": "List every expense and savings",
+            "status": "Pending",
+        },
+    )
+    todo_id = created.data.id
+    print(f"Created Todo => {created.data}")
 
-asyncio.run(main())
+    print("\n=== List ===")
+    todos = await client.call_tool("list_todos")
+    for todo in todos.data:
+        print(f"Todo: {todo}")
 
+    print("\n=== Get by title ===")
+    found = await client.call_tool("get_todo_by_title", {"todo_title": "monthly"})
+    print(f"Todo found by title: {found.data}")
+
+    print("\n=== Update ===")
+    updated = await client.call_tool(
+        "update_todo", {"todo_id": todo_id, "status": "Completed"}
+    )
+    print(f"Updated Todo => {updated.data}")
+
+    print("\n=== List completed only ===")
+    completed = await client.call_tool("list_todos", {"status": "Completed"})
+    for todo in completed.data:
+        print(f"Todo: {todo}")
+
+    print("\n=== Resource ===")
+    contents = await client.read_resource("todos://get_all")
+    for item in contents:
+        print(item.text)
+
+    print("\n=== Delete ===")
+    deleted = await client.call_tool("delete_todo", {"todo_id": todo_id})
+    print(deleted.data)
+
+
+async def main() -> None:
+    # One Client = one connection and one OAuth login for the whole run.
+    async with Client(MCP_URL, auth=_get_auth_config()) as client:
+        try:
+            await demo(client)
+            await call_tools(client)
+        except ToolError as e:
+            print(f"\nServer rejected the call: {e}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

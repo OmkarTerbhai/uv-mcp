@@ -1,0 +1,2 @@
+# All app related constants
+
